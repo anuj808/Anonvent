@@ -60,7 +60,7 @@ export const Feed: React.FC<FeedProps> = ({
   };
 
   useEffect(() => {
-    api.get('/health')
+    api.get('/api/health')
       .then((res) => {
         if (res.data && res.data.status === 'ok') {
           setServerStatus('online');
@@ -78,7 +78,7 @@ export const Feed: React.FC<FeedProps> = ({
     try {
       setIsLoading(true);
       const tagQuery = tagFilter ? `&tag=${tagFilter}` : '';
-      const response = await api.get(`/posts?page=${pageNum}${tagQuery}`);
+      const response = await api.get(`/api/posts?page=${pageNum}${tagQuery}`);
       
       if (response.data) {
         if (append) {
@@ -119,7 +119,7 @@ export const Feed: React.FC<FeedProps> = ({
       return;
     }
     try {
-      const response = await api.post('/chat/start', { postId });
+      const response = await api.post('/api/chat/start', { postId });
       if (response.data && response.data.roomId) {
         onNavigateToChat(response.data.roomId);
       }
@@ -150,7 +150,7 @@ export const Feed: React.FC<FeedProps> = ({
   const handleDeletePost = async (postId: string) => {
     if (!window.confirm('Are you sure you want to remove this post?')) return;
     try {
-      await api.delete(`/posts/${postId}`);
+      await api.delete(`/api/posts/${postId}`);
       setPosts((prev) => prev.filter((p) => p._id !== postId));
     } catch (error) {
       alert('Failed to delete post. You may not be authorized.');

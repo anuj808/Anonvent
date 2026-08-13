@@ -49,7 +49,7 @@ export const ChatRoom: React.FC<ChatRoomProps> = ({ roomId, onNavigateToInbox })
     const confirmText = "You won't see each other's posts or messages anymore. This can't be undone from here.";
     if (!window.confirm(confirmText)) return;
     try {
-      await api.post('/blocks', { roomId });
+      await api.post('/api/blocks', { roomId });
       alert('User blocked successfully.');
       onNavigateToInbox();
     } catch (err) {
@@ -69,7 +69,7 @@ export const ChatRoom: React.FC<ChatRoomProps> = ({ roomId, onNavigateToInbox })
     try {
       setIsLoading(true);
       setError(null);
-      const response = await api.get(`/chat/rooms/${roomId}/messages`);
+      const response = await api.get(`/api/chat/rooms/${roomId}/messages`);
       if (response.data) {
         setRoomStatus(response.data.status);
         setMessages(response.data.messages);
@@ -172,7 +172,7 @@ export const ChatRoom: React.FC<ChatRoomProps> = ({ roomId, onNavigateToInbox })
   const handleEndChat = async () => {
     if (!window.confirm('Are you sure you want to end this conversation permanently? This room will be closed.')) return;
     try {
-      await api.post(`/chat/rooms/${roomId}/close`);
+      await api.post(`/api/chat/rooms/${roomId}/close`);
       setRoomStatus('closed');
       onNavigateToInbox();
     } catch (err) {
