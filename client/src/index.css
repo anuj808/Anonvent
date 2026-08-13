@@ -1,0 +1,24 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --text-primary: #1E252B;   /* High-contrast charcoal slate */
+  --text-secondary: #3A453F; /* Medium-contrast deep slate green */
+  --text-muted: #5A6660;     /* Low-contrast dark sage gray (Still passes WCAG AA) */
+}
+
+@layer base {
+  body {
+    color: var(--text-primary);
+    @apply bg-background antialiased selection:bg-primary/20 selection:text-primary-dark;
+    font-size: 17px;
+    line-height: 1.75;
+    margin: 0;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    color: var(--text-primary);
+    @apply font-semibold tracking-tight;
+  }
+}

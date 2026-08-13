@@ -1,0 +1,24 @@
+# Task List - Reporting, Blocking, & Admin Moderation
+
+- [x] Project Setup & Base Adaptations
+  - [x] Resolve PostCSS class apply compilation bugs
+  - [x] Extend `AuthContextType` and `AuthProvider` to propagate `isAdmin` status
+- [x] Reporting & Blocking Systems
+  - [x] Create Report model `server/models/Report.js`
+  - [x] Create Block model `server/models/Block.js`
+  - [x] Create Reports router `server/routes/reports.js` (Rate limited to 10/hour)
+  - [x] Create Blocks router `server/routes/blocks.js` (Ends active chat rooms)
+  - [x] Exclude blocked posts from `GET /api/posts`
+  - [x] Exclude blocked messages in Socket.IO `send_message` handler
+  - [x] Enforce blocking constraints in `POST /api/chat/start`
+- [x] Admin Moderation Systems
+  - [x] Add `isAdmin` boolean parameter to User model schema
+  - [x] Expose `isAdmin` parameter in `/login` and `/me` routes
+  - [x] Create Admin router `server/routes/admin.js` (Pending reports, flagged posts, unflag, delete)
+  - [x] Create reusable `ReportModal` component with custom status confirmation
+  - [x] Create Admin dashboard view `client/src/pages/Admin.tsx`
+  - [x] Map popstate History router syncing rules in `App.tsx`
+  - [x] Render Admin Navbar triggers inside `Feed.tsx`
+- [x] Verification & Documentation
+  - [x] Run compilation build tests
+  - [x] Update `walkthrough.md` with Atlas instructions and report/block/chat closing tests

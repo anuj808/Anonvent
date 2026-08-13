@@ -1,0 +1,21 @@
+services:
+  - type: web
+    name: anonvent-api
+    env: node
+    plan: free
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 5000
+      - key: MONGO_URI
+        sync: false
+        placeholder: "MongoDB Atlas connection URI"
+      - key: JWT_SECRET
+        sync: false
+        placeholder: "Secure JWT signing secret key"
+      - key: ALLOWED_ORIGIN
+        sync: false
+        placeholder: "Comma-separated list of whitelisted CORS origins"
