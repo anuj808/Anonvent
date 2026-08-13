@@ -27,7 +27,7 @@ app.use(helmet());
 
 // Set up CORS with support for multiple origins (comma-separated list)
 const allowedOrigins = process.env.ALLOWED_ORIGIN
-  ? process.env.ALLOWED_ORIGIN.split(',').map((o) => o.trim())
+  ? process.env.ALLOWED_ORIGIN.split(',').map((o) => o.trim().replace(/\/$/, ''))
   : ['http://localhost:5173'];
 
 app.use(cors({

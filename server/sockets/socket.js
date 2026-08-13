@@ -32,7 +32,7 @@ const sanitizeContent = (str) => {
 
 export const initSocket = (httpServer) => {
   const allowedOrigins = process.env.ALLOWED_ORIGIN
-    ? process.env.ALLOWED_ORIGIN.split(',').map((o) => o.trim())
+    ? process.env.ALLOWED_ORIGIN.split(',').map((o) => o.trim().replace(/\/$/, ''))
     : ['http://localhost:5173'];
 
   io = new Server(httpServer, {
