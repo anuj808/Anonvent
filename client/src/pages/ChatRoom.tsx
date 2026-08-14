@@ -23,13 +23,6 @@ interface ChatRoomProps {
   onNavigateToInbox: () => void;
 }
 
-const decodeStoredMessageContent = (content: string) => {
-  if (typeof document === 'undefined') return content;
-  const textarea = document.createElement('textarea');
-  textarea.innerHTML = content;
-  return textarea.value;
-};
-
 // Helpers for hash-based visual identity
 const getAvatarColor = (anonId: string) => {
   if (!anonId) return 'from-stone-300 to-stone-400';
@@ -392,7 +385,7 @@ export const ChatRoom: React.FC<ChatRoomProps> = ({ roomId, onNavigateToInbox })
         <div
           ref={messageScrollRef}
           onScroll={handleMessageScroll}
-          className="flex-grow overflow-y-auto max-h-[calc(100vh-140px)]"
+          className="flex-grow overflow-y-auto max-h-[calc(100vh-140px)] bg-[radial-gradient(circle_at_1px_1px,rgba(96,114,100,0.045)_1px,transparent_0),linear-gradient(180deg,rgba(248,246,240,0.98)_0%,rgba(239,242,239,0.55)_50%,rgba(248,246,240,0.98)_100%)] bg-[length:18px_18px,100%_100%]"
         >
           <Container size="md" className="py-6 flex flex-col space-y-4">
             {isLoading ? (
@@ -453,11 +446,11 @@ export const ChatRoom: React.FC<ChatRoomProps> = ({ roomId, onNavigateToInbox })
                         <div
                           className={`py-2.5 px-4 text-sm leading-relaxed whitespace-pre-wrap ${
                             isMe
-                              ? 'bg-[#607264] text-white rounded-2xl rounded-tr-sm rounded-br-2xl'
-                              : 'bg-card text-text-primary border border-card-border/40 rounded-2xl rounded-tl-sm rounded-bl-2xl shadow-subtle'
+                              ? 'bg-[#607264] text-white rounded-2xl rounded-tr-sm rounded-br-2xl shadow-soft'
+                              : 'bg-card text-text-primary border border-card-border/40 rounded-2xl rounded-tl-sm rounded-bl-2xl shadow-soft'
                           }`}
                         >
-                          {decodeStoredMessageContent(msg.content)}
+                          {msg.content}
                         </div>
                         <div className={`flex items-center gap-1.5 mt-1 px-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200 text-text-muted ${isMe ? 'self-end' : 'self-start'}`}>
                           <span className="text-[9px] font-medium">
