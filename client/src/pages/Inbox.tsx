@@ -25,13 +25,6 @@ interface ChatRoomType {
   createdAt: string;
 }
 
-const decodeStoredMessageContent = (content: string) => {
-  if (typeof document === 'undefined') return content;
-  const textarea = document.createElement('textarea');
-  textarea.innerHTML = content;
-  return textarea.value;
-};
-
 export const Inbox: React.FC<InboxProps> = ({
   onNavigateToHome,
   onNavigateToFeed,
@@ -150,7 +143,7 @@ export const Inbox: React.FC<InboxProps> = ({
                             )}
                           </div>
                           <p className="text-sm text-text-secondary font-light line-clamp-1 pr-6 leading-relaxed">
-                            {room.lastMessage ? decodeStoredMessageContent(room.lastMessage.content) : 'No messages yet'}
+                            {room.lastMessage ? room.lastMessage.content : 'No messages yet'}
                           </p>
                         </div>
                       </div>
