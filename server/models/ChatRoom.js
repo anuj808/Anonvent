@@ -31,6 +31,15 @@ const chatRoomSchema = new mongoose.Schema({
     },
     required: true,
   },
+  participantDisplayNames: {
+    type: [String],
+    validate: {
+      validator: function (val) {
+        return Array.isArray(val) && val.length === 2;
+      },
+      message: 'A chat room must store exactly 2 display names',
+    },
+  },
   status: {
     type: String,
     enum: ['active', 'closed'],

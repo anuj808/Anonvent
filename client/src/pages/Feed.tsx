@@ -15,6 +15,7 @@ import CrisisModal from '../components/posts/CrisisModal';
 interface PostType {
   _id: string;
   authorAnonId: string;
+  authorDisplayName?: string;
   content: string;
   tags: string[];
   status: string;
@@ -48,10 +49,14 @@ const getAvatarColor = (anonId: string) => {
   return gradients[index];
 };
 
-const getAvatarInitials = (anonId: string) => {
-  if (!anonId) return 'An';
-  const clean = anonId.replace('Anon_', '');
-  return clean.substring(0, 2).toUpperCase();
+const getAvatarInitials = (name: string) => {
+  if (!name) return 'An';
+  return name
+    .split(' ')
+    .map((part) => part[0])
+    .join('')
+    .substring(0, 2)
+    .toUpperCase();
 };
 
 // Pulsing skeleton card loader component
@@ -111,7 +116,7 @@ export const Feed: React.FC<FeedProps> = ({
   initialOpenPost,
   clearInitialOpenPost,
 }) => {
-  const { anonId, isAuthenticated, logout, openAuthModal, isAdmin } = useAuth();
+  const { anonId, displayName, isAuthenticated, logout, openAuthModal, isAdmin } = useAuth();
   const [posts, setPosts] = useState<PostType[]>([]);
   const [page, setPage] = useState<number>(1);
   const [selectedTag, setSelectedTag] = useState<string | null>(null);
@@ -287,7 +292,7 @@ export const Feed: React.FC<FeedProps> = ({
                   Inbox
                 </button>
                 <span className="inline-flex items-center px-3 py-1 rounded-full bg-primary-light text-primary text-xs font-semibold border border-primary/20 shadow-subtle">
-                  Identity: {anonId}
+                  Identity: {displayName || anonId}
                 </span>
                 <button
                   onClick={logout}
@@ -411,11 +416,11 @@ export const Feed: React.FC<FeedProps> = ({
                             <div className="flex items-center justify-between gap-3 mb-4">
                               <div className="flex items-center gap-3">
                                 <div className={`w-9 h-9 rounded-full bg-gradient-to-tr ${getAvatarColor(post.authorAnonId)} flex items-center justify-center text-white text-[11px] font-bold shadow-sm shrink-0`}>
-                                  {getAvatarInitials(post.authorAnonId)}
+                                  {getAvatarInitials(post.authorDisplayName || post.authorAnonId)}
                                 </div>
                                 <div className="flex flex-col">
                                   <span className="text-xs font-semibold text-text-primary leading-none">
-                                    {post.authorAnonId}
+                                    {post.authorDisplayName || post.authorAnonId}
                                   </span>
                                   <span className="text-[10px] text-text-muted font-light mt-1">
                                     {formatDistanceToNow(new Date(post.createdAt), { addSuffix: true })}

@@ -153,7 +153,7 @@ export const AuthModal: React.FC = () => {
 
               {/* Security Privacy Microcopy */}
               <div className="p-3.5 bg-primary-light border border-primary/10 rounded-xl text-[11px] text-text-secondary leading-relaxed font-normal">
-                🔒 We only ever show others your generated **Anonymous ID** (e.g. Anon_a7f3e), never your email. We do not require names or profiles.
+                We only ever show others your generated anonymous display name, never your email. We do not require names or profiles.
               </div>
 
               <Button

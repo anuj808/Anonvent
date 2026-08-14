@@ -24,8 +24,8 @@ router.get('/reports', authMiddleware, adminMiddleware, async (req, res) => {
     const skip = (page - 1) * limit;
 
     const reports = await Report.find({ status: statusFilter })
-      .populate('reporterId', 'anonId')
-      .populate('reportedUserId', 'anonId')
+      .populate('reporterId', 'anonId displayName')
+      .populate('reportedUserId', 'anonId displayName')
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limit);
@@ -73,8 +73,17 @@ router.patch('/reports/:id', authMiddleware, adminMiddleware, async (req, res) =
 // Lists all posts flagged for review by the crisis checks
 router.get('/flagged-posts', authMiddleware, adminMiddleware, async (req, res) => {
   try {
-    const posts = await Post.find({ flaggedForReview: true }).sort({ createdAt: -1 });
-    return res.status(200).json(posts);
+    const posts = await Post.find({ flaggedForReview: true })
+      .populate('authorId', 'displayName')
+      .sort({ createdAt: -1 });
+    return res.status(200).json(posts.map((post) => ({
+      _id: post._id,
+      authorAnonId: post.authorAnonId,
+      authorDisplayName: post.authorDisplayName || post.authorId?.displayName || post.authorAnonId,
+      content: post.content,
+      tags: post.tags,
+      createdAt: post.createdAt,
+    })));
   } catch (error) {
     console.error('Error fetching flagged posts');
     return res.status(500).json({ message: 'Internal server error' });

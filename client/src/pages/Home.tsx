@@ -13,7 +13,7 @@ interface HomeProps {
 
 const Home: React.FC<HomeProps> = ({ onNavigateToFeed }) => {
   const [serverStatus, setServerStatus] = useState<'connecting' | 'online' | 'offline'>('connecting');
-  const { anonId, isAuthenticated, logout, openAuthModal } = useAuth();
+  const { displayName, isAuthenticated, logout, openAuthModal } = useAuth();
 
   useEffect(() => {
     api.get('health')
@@ -80,7 +80,7 @@ const Home: React.FC<HomeProps> = ({ onNavigateToFeed }) => {
             {isAuthenticated ? (
               <div className="flex items-center gap-3">
                 <span className="inline-flex items-center px-3 py-1 rounded-full bg-primary-light text-primary text-xs font-semibold border border-primary/20 shadow-subtle">
-                  Identity: {anonId}
+                  Identity: {displayName}
                 </span>
                 <button
                   onClick={logout}

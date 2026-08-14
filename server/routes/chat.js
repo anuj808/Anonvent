@@ -3,6 +3,7 @@ import ChatRoom from '../models/ChatRoom.js';
 import Message from '../models/Message.js';
 import Post from '../models/Post.js';
 import Block from '../models/Block.js';
+import User from '../models/User.js';
 import authMiddleware from '../middleware/auth.js';
 
 const router = express.Router();
@@ -39,9 +40,8 @@ router.post('/start', authMiddleware, async (req, res) => {
       return res.status(400).json({ message: 'Cannot start conversation: A block exists between you and this user' });
     }
 
-    // Check for existing active room
+    // Check for an existing active room between the same two users, regardless of post
     const existingRoom = await ChatRoom.findOne({
-      postId,
       participants: { $all: [req.user.userId, post.authorId] },
       status: 'active',
     });
@@ -50,11 +50,17 @@ router.post('/start', authMiddleware, async (req, res) => {
       return res.status(200).json({ roomId: existingRoom._id });
     }
 
+    const author = await User.findById(post.authorId).select('displayName anonId');
+
     // Create a new room
     const newRoom = new ChatRoom({
       postId,
       participants: [req.user.userId, post.authorId],
       participantAnonIds: [req.user.anonId, post.authorAnonId],
+      participantDisplayNames: [
+        req.user.displayName || req.user.anonId,
+        author?.displayName || post.authorDisplayName || post.authorAnonId,
+      ],
     });
 
     await newRoom.save();
@@ -74,7 +80,8 @@ router.post('/start', authMiddleware, async (req, res) => {
 // Returns all rooms the logged-in user is a participant of
 router.get('/rooms', authMiddleware, async (req, res) => {
   try {
-    const rooms = await ChatRoom.find({ participants: req.user.userId });
+    const rooms = await ChatRoom.find({ participants: req.user.userId })
+      .populate('participants', 'anonId displayName');
 
     const roomsWithPreview = await Promise.all(
       rooms.map(async (room) => {
@@ -82,14 +89,23 @@ router.get('/rooms', authMiddleware, async (req, res) => {
         const lastMsg = await Message.findOne({ roomId: room._id }).sort({ createdAt: -1 });
 
         // Identify other participant
-        const otherIndex = room.participants.indexOf(req.user.userId) === 0 ? 1 : 0;
+        const currentIndex = room.participants.findIndex((participant) => (
+          participant._id?.toString() || participant.toString()
+        ) === req.user.userId);
+        const otherIndex = currentIndex === 0 ? 1 : 0;
+        const otherParticipant = room.participants[otherIndex];
         const otherAnonId = room.participantAnonIds[otherIndex];
+        const otherDisplayName =
+          room.participantDisplayNames?.[otherIndex] ||
+          otherParticipant?.displayName ||
+          otherAnonId;
 
         return {
           _id: room._id,
           postId: room.postId,
           status: room.status,
           otherParticipantAnonId: otherAnonId,
+          otherParticipantDisplayName: otherDisplayName,
           lastMessage: lastMsg
             ? {
                 content: lastMsg.content,
@@ -130,14 +146,36 @@ router.get('/rooms/:roomId/messages', authMiddleware, async (req, res) => {
       return res.status(403).json({ message: 'Access denied: You are not a participant in this conversation' });
     }
 
+    const page = Math.max(parseInt(req.query.page) || 1, 1);
+    const limit = Math.min(Math.max(parseInt(req.query.limit) || 30, 1), 100);
+    const skip = (page - 1) * limit;
+
+    const totalMessages = await Message.countDocuments({ roomId: req.params.roomId });
     const messages = await Message.find({ roomId: req.params.roomId })
-      .sort({ createdAt: 1 })
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit)
       .select('_id roomId senderAnonId content createdAt'); // Excludes private senderId
+    messages.reverse();
+
+    const populatedRoom = await room.populate('participants', 'anonId displayName');
+    const participantDisplayNames = populatedRoom.participants.map((participant, index) => (
+      room.participantDisplayNames?.[index] ||
+      participant.displayName ||
+      room.participantAnonIds[index]
+    ));
 
     return res.status(200).json({
       status: room.status,
       participantAnonIds: room.participantAnonIds,
+      participantDisplayNames,
       messages,
+      pagination: {
+        page,
+        limit,
+        hasMore: skip + messages.length < totalMessages,
+        total: totalMessages,
+      },
     });
   } catch (error) {
     console.error('Error fetching messages');

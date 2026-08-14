@@ -3,9 +3,12 @@
 @tailwind utilities;
 
 :root {
-  --text-primary: #1E252B;   /* High-contrast charcoal slate */
-  --text-secondary: #3A453F; /* Medium-contrast deep slate green */
-  --text-muted: #5A6660;     /* Low-contrast dark sage gray (Still passes WCAG AA) */
+  --text-primary: #1E252B;
+  /* High-contrast charcoal slate */
+  --text-secondary: #3A453F;
+  /* Medium-contrast deep slate green */
+  --text-muted: #5A6660;
+  /* Low-contrast dark sage gray (Still passes WCAG AA) */
 }
 
 @layer base {
@@ -17,7 +20,12 @@
     margin: 0;
   }
 
-  h1, h2, h3, h4, h5, h6 {
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
     color: var(--text-primary);
     @apply font-semibold tracking-tight;
   }

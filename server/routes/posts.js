@@ -82,6 +82,7 @@ router.post('/', authMiddleware, postLimiter, async (req, res) => {
     const newPost = new Post({
       authorId: req.user.userId,
       authorAnonId: req.user.anonId,
+      authorDisplayName: req.user.displayName || req.user.anonId,
       content: sanitizedContent,
       tags,
       flaggedForReview: isCrisis,
@@ -93,6 +94,7 @@ router.post('/', authMiddleware, postLimiter, async (req, res) => {
     const responsePost = {
       _id: newPost._id,
       authorAnonId: newPost.authorAnonId,
+      authorDisplayName: newPost.authorDisplayName || newPost.authorAnonId,
       content: newPost.content,
       tags: newPost.tags,
       status: newPost.status,
@@ -156,9 +158,18 @@ router.get('/', async (req, res) => {
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limit)
-      .select('_id authorAnonId content tags status createdAt'); // Exclude authorId
+      .populate('authorId', 'displayName')
+      .select('_id authorId authorAnonId authorDisplayName content tags status createdAt');
 
-    return res.status(200).json(posts);
+    return res.status(200).json(posts.map((post) => ({
+      _id: post._id,
+      authorAnonId: post.authorAnonId,
+      authorDisplayName: post.authorDisplayName || post.authorId?.displayName || post.authorAnonId,
+      content: post.content,
+      tags: post.tags,
+      status: post.status,
+      createdAt: post.createdAt,
+    })));
   } catch (error) {
     console.error('Error fetching posts');
     return res.status(500).json({ message: 'Internal server error' });
@@ -170,9 +181,17 @@ router.get('/mine', authMiddleware, async (req, res) => {
   try {
     const posts = await Post.find({ authorId: req.user.userId })
       .sort({ createdAt: -1 })
-      .select('_id authorAnonId content tags status createdAt'); // Exclude authorId
+      .select('_id authorAnonId authorDisplayName content tags status createdAt');
 
-    return res.status(200).json(posts);
+    return res.status(200).json(posts.map((post) => ({
+      _id: post._id,
+      authorAnonId: post.authorAnonId,
+      authorDisplayName: post.authorDisplayName || req.user.displayName || post.authorAnonId,
+      content: post.content,
+      tags: post.tags,
+      status: post.status,
+      createdAt: post.createdAt,
+    })));
   } catch (error) {
     console.error('Error fetching user posts');
     return res.status(500).json({ message: 'Internal server error' });

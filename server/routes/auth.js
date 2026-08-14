@@ -21,6 +21,61 @@ const DISPOSABLE_DOMAINS = [
   'trashmail.com'
 ];
 
+const CALMING_ADJECTIVES = [
+  'Gentle',
+  'Quiet',
+  'Misty',
+  'Calm',
+  'Soft',
+  'Bright',
+  'Kind',
+  'Warm',
+  'Peaceful',
+  'Still',
+  'Sunny',
+  'Tender',
+];
+
+const ANONYMOUS_NOUNS = [
+  'Fox',
+  'Willow',
+  'Harbor',
+  'Sparrow',
+  'Daisy',
+  'River',
+  'Cedar',
+  'Lily',
+  'Meadow',
+  'Robin',
+  'Aspen',
+  'Brook',
+  'Iris',
+  'Finch',
+  'Vale',
+];
+
+const generateDisplayNameCandidate = () => {
+  const adjective = CALMING_ADJECTIVES[crypto.randomInt(CALMING_ADJECTIVES.length)];
+  const noun = ANONYMOUS_NOUNS[crypto.randomInt(ANONYMOUS_NOUNS.length)];
+  return `${adjective} ${noun}`;
+};
+
+const generateUniqueDisplayName = async () => {
+  for (let attempts = 0; attempts < 20; attempts++) {
+    const candidate = generateDisplayNameCandidate();
+    const conflict = await User.findOne({ displayName: candidate });
+    if (!conflict) return candidate;
+  }
+
+  for (let suffix = 2; suffix < 1000; suffix++) {
+    const candidate = `${generateDisplayNameCandidate()} ${suffix}`;
+    const conflict = await User.findOne({ displayName: candidate });
+    if (!conflict) return candidate;
+  }
+
+  return null;
+};
+
 // POST /api/auth/register
 router.post('/register', async (req, res) => {
   try {
@@ -72,6 +127,11 @@ router.post('/register', async (req, res) => {
       return res.status(500).json({ message: 'Error generating unique identity' });
     }
 
+    const displayName = await generateUniqueDisplayName();
+    if (!displayName) {
+      return res.status(500).json({ message: 'Error generating unique identity' });
+    }
+
     // Hash password with 12 rounds
     const salt = await bcrypt.genSalt(12);
     const passwordHash = await bcrypt.hash(password, salt);
@@ -80,13 +140,14 @@ router.post('/register', async (req, res) => {
     const newUser = new User({
       email,
       passwordHash,
-      anonId
+      anonId,
+      displayName
     });
 
     await newUser.save();
 
-    // Secure payload: Only return anonId and isAdmin (false by default)
-    return res.status(201).json({ anonId, isAdmin: false });
+    // Secure payload: Only return anonymous identity and isAdmin (false by default)
+    return res.status(201).json({ anonId, displayName, isAdmin: false });
   } catch (error) {
     console.error('Registration error occurred'); // Avoid logging req.body or passwords
     return res.status(500).json({ message: 'Internal server error' });
@@ -116,7 +177,7 @@ router.post('/login', async (req, res) => {
     // Issue JWT
     const secret = process.env.JWT_SECRET || 'change_this_to_a_secure_random_string_in_production';
     const token = jwt.sign(
-      { userId: user._id, anonId: user.anonId, isAdmin: user.isAdmin },
+      { userId: user._id, anonId: user.anonId, displayName: user.displayName || user.anonId, isAdmin: user.isAdmin },
       secret,
       { expiresIn: '7d' }
     );
@@ -130,8 +191,8 @@ router.post('/login', async (req, res) => {
       maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
     });
 
-    // Secure payload: return anonId and isAdmin
-    return res.status(200).json({ anonId: user.anonId, isAdmin: user.isAdmin });
+    // Secure payload: return anonymous identity and isAdmin
+    return res.status(200).json({ anonId: user.anonId, displayName: user.displayName || user.anonId, isAdmin: user.isAdmin });
   } catch (error) {
     console.error('Login error occurred'); // Avoid logging req.body or passwords
     return res.status(500).json({ message: 'Internal server error' });
@@ -151,8 +212,8 @@ router.post('/logout', (req, res) => {
 
 // GET /api/auth/me
 router.get('/me', authMiddleware, (req, res) => {
-  // Returns the anonId and isAdmin status
-  return res.status(200).json({ anonId: req.user.anonId, isAdmin: req.user.isAdmin });
+  // Returns anonymous identity and isAdmin status
+  return res.status(200).json({ anonId: req.user.anonId, displayName: req.user.displayName, isAdmin: req.user.isAdmin });
 });
 
 export default router;

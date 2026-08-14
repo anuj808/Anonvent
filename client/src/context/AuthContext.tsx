@@ -3,6 +3,7 @@ import api from '../lib/axios';
 
 interface AuthContextType {
   anonId: string | null;
+  displayName: string | null;
   isAdmin: boolean;
   isAuthenticated: boolean;
   isLoading: boolean;
@@ -18,6 +19,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [anonId, setAnonId] = useState<string | null>(null);
+  const [displayName, setDisplayName] = useState<string | null>(null);
   const [isAdmin, setIsAdmin] = useState<boolean>(false);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState<boolean>(false);
@@ -27,13 +29,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const response = await api.get('auth/me');
       if (response.data && response.data.anonId) {
         setAnonId(response.data.anonId);
+        setDisplayName(response.data.displayName || response.data.anonId);
         setIsAdmin(!!response.data.isAdmin);
       } else {
         setAnonId(null);
+        setDisplayName(null);
         setIsAdmin(false);
       }
     } catch (error) {
       setAnonId(null);
+      setDisplayName(null);
       setIsAdmin(false);
     } finally {
       setIsLoading(false);
@@ -48,6 +53,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const response = await api.post('auth/login', { email, password });
     if (response.data && response.data.anonId) {
       setAnonId(response.data.anonId);
+      setDisplayName(response.data.displayName || response.data.anonId);
       setIsAdmin(!!response.data.isAdmin);
       setIsAuthModalOpen(false);
     }
@@ -68,6 +74,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       console.error('Logout error occurred');
     } finally {
       setAnonId(null);
+      setDisplayName(null);
       setIsAdmin(false);
     }
   };
@@ -81,6 +88,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     <AuthContext.Provider
       value={{
         anonId,
+        displayName,
         isAdmin,
         isAuthenticated,
         isLoading,

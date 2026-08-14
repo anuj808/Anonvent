@@ -18,6 +18,12 @@ const userSchema = new mongoose.Schema({
     unique: true,
     index: true,
   },
+  displayName: {
+    type: String,
+    unique: true,
+    sparse: true,
+    index: true,
+  },
   createdAt: {
     type: Date,
     default: Date.now,

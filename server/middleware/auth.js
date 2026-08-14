@@ -15,6 +15,7 @@ const authMiddleware = (req, res, next) => {
     req.user = {
       userId: decoded.userId,
       anonId: decoded.anonId,
+      displayName: decoded.displayName || decoded.anonId,
       isAdmin: decoded.isAdmin || false,
     };
     

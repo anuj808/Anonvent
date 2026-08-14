@@ -12,6 +12,9 @@ const postSchema = new mongoose.Schema({
     type: String,
     required: [true, 'Author anonymous ID is required'],
   },
+  authorDisplayName: {
+    type: String,
+  },
   content: {
     type: String,
     required: [true, 'Post content is required'],

@@ -17,6 +17,7 @@ interface ChatRoomType {
   _id: string;
   status: string;
   otherParticipantAnonId: string;
+  otherParticipantDisplayName?: string;
   lastMessage: {
     content: string;
     createdAt: string;
@@ -24,12 +25,19 @@ interface ChatRoomType {
   createdAt: string;
 }
 
+const decodeStoredMessageContent = (content: string) => {
+  if (typeof document === 'undefined') return content;
+  const textarea = document.createElement('textarea');
+  textarea.innerHTML = content;
+  return textarea.value;
+};
+
 export const Inbox: React.FC<InboxProps> = ({
   onNavigateToHome,
   onNavigateToFeed,
   onNavigateToChat,
 }) => {
-  const { anonId, isAuthenticated, logout } = useAuth();
+  const { anonId, displayName, isAuthenticated, logout } = useAuth();
   const [rooms, setRooms] = useState<ChatRoomType[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
@@ -75,7 +83,7 @@ export const Inbox: React.FC<InboxProps> = ({
               Feed
             </button>
             <span className="inline-flex items-center px-3 py-1 rounded-full bg-primary-light text-primary text-xs font-semibold border border-primary/20 shadow-subtle">
-              Identity: {anonId}
+              Identity: {displayName || anonId}
             </span>
             <button
               onClick={logout}
@@ -133,7 +141,7 @@ export const Inbox: React.FC<InboxProps> = ({
                         <div className="space-y-1">
                           <div className="flex items-center gap-2">
                             <span className="text-sm font-semibold text-text-primary">
-                              {room.otherParticipantAnonId}
+                              {room.otherParticipantDisplayName || room.otherParticipantAnonId}
                             </span>
                             {isClosed && (
                               <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-card-darker text-text-muted border border-card-border/50">
@@ -142,7 +150,7 @@ export const Inbox: React.FC<InboxProps> = ({
                             )}
                           </div>
                           <p className="text-sm text-text-secondary font-light line-clamp-1 pr-6 leading-relaxed">
-                            {room.lastMessage ? room.lastMessage.content : 'No messages yet'}
+                            {room.lastMessage ? decodeStoredMessageContent(room.lastMessage.content) : 'No messages yet'}
                           </p>
                         </div>
                       </div>

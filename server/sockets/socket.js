@@ -18,16 +18,11 @@ const parseCookies = (cookieString) => {
   return list;
 };
 
-// Helper to escape HTML tags to prevent XSS
+// React renders chat content as text, so store valid UTF-8 exactly as typed.
+// XSS prevention belongs at render time, not by HTML-encoding saved content.
 const sanitizeContent = (str) => {
   if (typeof str !== 'string') return '';
-  return str
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#x27;')
-    .replace(/\//g, '&#x2F;');
+  return str.trim();
 };
 
 export const initSocket = (httpServer) => {
@@ -60,6 +55,7 @@ export const initSocket = (httpServer) => {
       socket.user = {
         userId: decoded.userId,
         anonId: decoded.anonId,
+        displayName: decoded.displayName || decoded.anonId,
       };
 
       next();
@@ -167,7 +163,7 @@ export const initSocket = (httpServer) => {
           return socket.emit('error_message', { message: 'Invalid message length' });
         }
 
-        // Sanitize XSS tags
+        // Keep the original UTF-8 text intact; React text nodes escape it safely.
         const sanitizedContent = sanitizeContent(trimmedContent);
 
         // Save Message

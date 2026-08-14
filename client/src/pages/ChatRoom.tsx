@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useLayoutEffect, useState, useRef } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { isSameDay, format, isToday, isYesterday } from 'date-fns';
 import { Send, LogOut, ArrowLeft, ShieldAlert, Flag, MoreVertical } from 'lucide-react';
@@ -23,6 +23,13 @@ interface ChatRoomProps {
   onNavigateToInbox: () => void;
 }
 
+const decodeStoredMessageContent = (content: string) => {
+  if (typeof document === 'undefined') return content;
+  const textarea = document.createElement('textarea');
+  textarea.innerHTML = content;
+  return textarea.value;
+};
+
 // Helpers for hash-based visual identity
 const getAvatarColor = (anonId: string) => {
   if (!anonId) return 'from-stone-300 to-stone-400';
@@ -42,10 +49,14 @@ const getAvatarColor = (anonId: string) => {
   return gradients[index];
 };
 
-const getAvatarInitials = (anonId: string) => {
-  if (!anonId) return 'An';
-  const clean = anonId.replace('Anon_', '');
-  return clean.substring(0, 2).toUpperCase();
+const getAvatarInitials = (name: string) => {
+  if (!name) return 'An';
+  return name
+    .split(' ')
+    .map((part) => part[0])
+    .join('')
+    .substring(0, 2)
+    .toUpperCase();
 };
 
 const getMessageDateGroupLabel = (dateString: string) => {
@@ -60,10 +71,14 @@ export const ChatRoom: React.FC<ChatRoomProps> = ({ roomId, onNavigateToInbox })
   const { socket, isConnected, isReconnecting } = useSocket();
   const [messages, setMessages] = useState<MessageType[]>([]);
   const [otherParticipantAnonId, setOtherParticipantAnonId] = useState<string | null>(null);
+  const [otherParticipantDisplayName, setOtherParticipantDisplayName] = useState<string | null>(null);
   const [isOtherTyping, setIsOtherTyping] = useState<boolean>(false);
   const [inputText, setInputText] = useState<string>('');
   const [roomStatus, setRoomStatus] = useState<string>('active');
   const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [isLoadingOlder, setIsLoadingOlder] = useState<boolean>(false);
+  const [messagePage, setMessagePage] = useState<number>(1);
+  const [hasMoreMessages, setHasMoreMessages] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
   // Dropdown states
@@ -93,7 +108,10 @@ export const ChatRoom: React.FC<ChatRoomProps> = ({ roomId, onNavigateToInbox })
   };
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const messageScrollRef = useRef<HTMLDivElement>(null);
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const shouldScrollToBottomRef = useRef<boolean>(false);
+  const pendingScrollAnchorRef = useRef<{ height: number; top: number } | null>(null);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -104,15 +122,23 @@ export const ChatRoom: React.FC<ChatRoomProps> = ({ roomId, onNavigateToInbox })
     try {
       setIsLoading(true);
       setError(null);
-      const response = await api.get(`chat/rooms/${roomId}/messages`);
+      const response = await api.get(`chat/rooms/${roomId}/messages?page=1&limit=30`);
       if (response.data) {
         setRoomStatus(response.data.status);
         setMessages(response.data.messages);
+        setMessagePage(1);
+        setHasMoreMessages(!!response.data.pagination?.hasMore);
+        shouldScrollToBottomRef.current = true;
         
         // Find other participant anonId
-        const otherAnon = response.data.participantAnonIds.find((id: string) => id !== anonId);
+        const otherIndex = response.data.participantAnonIds.findIndex((id: string) => id !== anonId);
+        const otherAnon = response.data.participantAnonIds[otherIndex];
+        const otherDisplay = response.data.participantDisplayNames?.[otherIndex];
         if (otherAnon) {
           setOtherParticipantAnonId(otherAnon);
+        }
+        if (otherDisplay) {
+          setOtherParticipantDisplayName(otherDisplay);
         }
       }
     } catch (err: any) {
@@ -128,6 +154,38 @@ export const ChatRoom: React.FC<ChatRoomProps> = ({ roomId, onNavigateToInbox })
     }
   }, [roomId, isAuthenticated, anonId]);
 
+  const fetchOlderMessages = async () => {
+    if (!hasMoreMessages || isLoadingOlder || isLoading || !messageScrollRef.current) return;
+
+    try {
+      setIsLoadingOlder(true);
+      const scrollElement = messageScrollRef.current;
+      pendingScrollAnchorRef.current = {
+        height: scrollElement.scrollHeight,
+        top: scrollElement.scrollTop,
+      };
+
+      const nextPage = messagePage + 1;
+      const response = await api.get(`chat/rooms/${roomId}/messages?page=${nextPage}&limit=30`);
+      if (response.data) {
+        setMessages((prev) => [...response.data.messages, ...prev]);
+        setMessagePage(nextPage);
+        setHasMoreMessages(!!response.data.pagination?.hasMore);
+      }
+    } catch (err) {
+      alert('Failed to load older messages. Please try again.');
+      pendingScrollAnchorRef.current = null;
+    } finally {
+      setIsLoadingOlder(false);
+    }
+  };
+
+  const handleMessageScroll = () => {
+    const scrollElement = messageScrollRef.current;
+    if (!scrollElement || scrollElement.scrollTop > 48) return;
+    fetchOlderMessages();
+  };
+
   // Connect socket and listen to events
   useEffect(() => {
     if (!socket || roomStatus !== 'active') return;
@@ -136,6 +194,7 @@ export const ChatRoom: React.FC<ChatRoomProps> = ({ roomId, onNavigateToInbox })
 
     socket.on('receive_message', (message: MessageType) => {
       if (message.roomId === roomId) {
+        shouldScrollToBottomRef.current = true;
         setMessages((prev) => [...prev, message]);
       }
     });
@@ -164,10 +223,26 @@ export const ChatRoom: React.FC<ChatRoomProps> = ({ roomId, onNavigateToInbox })
     };
   }, [socket, roomId, roomStatus]);
 
-  // Scroll to bottom when messages load or change
+  useLayoutEffect(() => {
+    const anchor = pendingScrollAnchorRef.current;
+    const scrollElement = messageScrollRef.current;
+    if (anchor && scrollElement) {
+      scrollElement.scrollTop = scrollElement.scrollHeight - anchor.height + anchor.top;
+      pendingScrollAnchorRef.current = null;
+      return;
+    }
+
+    if (shouldScrollToBottomRef.current) {
+      scrollToBottom();
+      shouldScrollToBottomRef.current = false;
+    }
+  }, [messages]);
+
   useEffect(() => {
-    scrollToBottom();
-  }, [messages, isOtherTyping]);
+    if (isOtherTyping) {
+      scrollToBottom();
+    }
+  }, [isOtherTyping]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setInputText(e.target.value);
@@ -231,11 +306,11 @@ export const ChatRoom: React.FC<ChatRoomProps> = ({ roomId, onNavigateToInbox })
             
             <div className="flex items-center gap-2.5">
               <div className={`w-9 h-9 rounded-full bg-gradient-to-tr ${getAvatarColor(otherParticipantAnonId || '')} flex items-center justify-center text-white text-[11px] font-bold shadow-sm shrink-0`}>
-                {getAvatarInitials(otherParticipantAnonId || '')}
+                {getAvatarInitials(otherParticipantDisplayName || otherParticipantAnonId || '')}
               </div>
               <div className="flex flex-col">
                 <span className="text-sm font-semibold text-text-primary">
-                  {otherParticipantAnonId || 'Anonymous Peer'}
+                  {otherParticipantDisplayName || otherParticipantAnonId || 'Anonymous Peer'}
                 </span>
                 <span className="text-[10px] text-text-secondary font-light leading-none mt-1">
                   {roomStatus === 'closed' ? (
@@ -314,7 +389,11 @@ export const ChatRoom: React.FC<ChatRoomProps> = ({ roomId, onNavigateToInbox })
           </div>
         )}
 
-        <div className="flex-grow overflow-y-auto max-h-[calc(100vh-140px)] flex flex-col justify-end">
+        <div
+          ref={messageScrollRef}
+          onScroll={handleMessageScroll}
+          className="flex-grow overflow-y-auto max-h-[calc(100vh-140px)]"
+        >
           <Container size="md" className="py-6 flex flex-col space-y-4">
             {isLoading ? (
               <div className="text-center py-20 text-sm text-text-secondary">
@@ -331,15 +410,24 @@ export const ChatRoom: React.FC<ChatRoomProps> = ({ roomId, onNavigateToInbox })
             ) : messages.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-16 text-center space-y-3">
                 <div className={`w-14 h-14 rounded-full bg-gradient-to-tr ${getAvatarColor(otherParticipantAnonId || '')} flex items-center justify-center text-white text-base font-bold shadow-md`}>
-                  {getAvatarInitials(otherParticipantAnonId || '')}
+                  {getAvatarInitials(otherParticipantDisplayName || otherParticipantAnonId || '')}
                 </div>
-                <h4 className="text-sm font-semibold text-text-primary">{otherParticipantAnonId || 'Anonymous Peer'}</h4>
+                <h4 className="text-sm font-semibold text-text-primary">{otherParticipantDisplayName || otherParticipantAnonId || 'Anonymous Peer'}</h4>
                 <p className="text-xs text-text-secondary font-light max-w-[240px] leading-relaxed">
                   Say hello — you're both anonymous here in this peaceful space.
                 </p>
               </div>
             ) : (
               <div className="flex flex-col space-y-2">
+                {hasMoreMessages && (
+                  <button
+                    onClick={fetchOlderMessages}
+                    disabled={isLoadingOlder}
+                    className="self-center text-[11px] font-semibold text-text-secondary hover:text-primary disabled:opacity-60 transition-colors focus:outline-none py-2"
+                  >
+                    {isLoadingOlder ? 'Loading older messages...' : 'Load older messages'}
+                  </button>
+                )}
                 {messages.map((msg, index) => {
                   const isMe = msg.senderAnonId === anonId;
                   const currentDateLabel = getMessageDateGroupLabel(msg.createdAt);
@@ -369,7 +457,7 @@ export const ChatRoom: React.FC<ChatRoomProps> = ({ roomId, onNavigateToInbox })
                               : 'bg-card text-text-primary border border-card-border/40 rounded-2xl rounded-tl-sm rounded-bl-2xl shadow-subtle'
                           }`}
                         >
-                          {msg.content}
+                          {decodeStoredMessageContent(msg.content)}
                         </div>
                         <div className={`flex items-center gap-1.5 mt-1 px-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200 text-text-muted ${isMe ? 'self-end' : 'self-start'}`}>
                           <span className="text-[9px] font-medium">

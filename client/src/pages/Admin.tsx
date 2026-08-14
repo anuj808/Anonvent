@@ -13,8 +13,8 @@ interface AdminProps {
 
 interface ReportType {
   _id: string;
-  reporterId: { anonId: string };
-  reportedUserId: { anonId: string };
+  reporterId: { anonId: string; displayName?: string };
+  reportedUserId: { anonId: string; displayName?: string };
   reportType: 'post' | 'message';
   targetId: string;
   reason: string;
@@ -26,6 +26,7 @@ interface ReportType {
 interface FlaggedPostType {
   _id: string;
   authorAnonId: string;
+  authorDisplayName?: string;
   content: string;
   tags: string[];
   createdAt: string;
@@ -228,8 +229,8 @@ export const Admin: React.FC<AdminProps> = ({ onNavigateToHome, onNavigateToFeed
                       <tbody className="divide-y divide-card-border/40 text-xs text-text-primary">
                         {reports.map((report) => (
                           <tr key={report._id} className="hover:bg-background/25 transition-colors">
-                            <td className="px-6 py-4 font-semibold">{report.reporterId?.anonId || 'Guest/Deleted'}</td>
-                            <td className="px-6 py-4 font-semibold text-red-600">{report.reportedUserId?.anonId || 'Deleted'}</td>
+                            <td className="px-6 py-4 font-semibold">{report.reporterId?.displayName || report.reporterId?.anonId || 'Guest/Deleted'}</td>
+                            <td className="px-6 py-4 font-semibold text-red-600">{report.reportedUserId?.displayName || report.reportedUserId?.anonId || 'Deleted'}</td>
                             <td className="px-6 py-4 capitalize">{report.reportType}</td>
                             <td className="px-6 py-4 capitalize font-semibold">{report.reason.replace(/-/g, ' ')}</td>
                             <td className="px-6 py-4 max-w-xs truncate font-light" title={report.details}>
@@ -315,7 +316,7 @@ export const Admin: React.FC<AdminProps> = ({ onNavigateToHome, onNavigateToFeed
                       <tbody className="divide-y divide-card-border/40 text-xs text-text-primary">
                         {flaggedPosts.map((post) => (
                           <tr key={post._id} className="hover:bg-background/25 transition-colors">
-                            <td className="px-6 py-4 font-semibold">{post.authorAnonId}</td>
+                            <td className="px-6 py-4 font-semibold">{post.authorDisplayName || post.authorAnonId}</td>
                             <td className="px-6 py-4 max-w-md whitespace-pre-wrap font-light leading-relaxed">
                               {post.content}
                             </td>
