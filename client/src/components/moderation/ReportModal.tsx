@@ -45,7 +45,7 @@ export const ReportModal: React.FC<ReportModalProps> = ({
     setIsSubmitting(true);
 
     try {
-      await api.post('/reports', {
+      await api.post('reports', {
         reportType,
         targetId,
         reason,

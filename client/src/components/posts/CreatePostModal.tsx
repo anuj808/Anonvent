@@ -53,7 +53,7 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = ({
 
     setIsSubmitting(true);
     try {
-      const response = await api.post('/posts', {
+      const response = await api.post('posts', {
         content: trimmedContent,
         tags: selectedTags,
       });

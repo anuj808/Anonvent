@@ -36,7 +36,7 @@ export const Inbox: React.FC<InboxProps> = ({
   const fetchRooms = async () => {
     try {
       setIsLoading(true);
-      const res = await api.get('/api/chat/rooms');
+      const res = await api.get('chat/rooms');
       if (res.data) {
         setRooms(res.data);
       }

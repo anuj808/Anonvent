@@ -16,7 +16,7 @@ const Home: React.FC<HomeProps> = ({ onNavigateToFeed }) => {
   const { anonId, isAuthenticated, logout, openAuthModal } = useAuth();
 
   useEffect(() => {
-    api.get('/api/health')
+    api.get('health')
       .then((res) => {
         if (res.data && res.data.status === 'ok') {
           setServerStatus('online');

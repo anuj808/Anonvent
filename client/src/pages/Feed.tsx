@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { AnimatePresence } from 'framer-motion';
+import { AnimatePresence, motion } from 'framer-motion';
 import { formatDistanceToNow } from 'date-fns';
 import { Trash2, MessageSquare, Plus, Leaf, AlertCircle, Flag } from 'lucide-react';
 import api from '../lib/axios';
@@ -29,6 +29,79 @@ interface FeedProps {
   initialOpenPost?: boolean;
   clearInitialOpenPost?: () => void;
 }
+
+// Helpers for hash-based visual identity
+const getAvatarColor = (anonId: string) => {
+  let hash = 0;
+  for (let i = 0; i < anonId.length; i++) {
+    hash = anonId.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  const gradients = [
+    'from-[#A3B899] to-[#607264]', // Sage
+    'from-[#D2C5E3] to-[#9C8EB9]', // Soft lavender
+    'from-[#BEE3DB] to-[#89B0A5]', // Dusty teal
+    'from-[#E8D7F1] to-[#D3BCCC]', // Lavender blush
+    'from-[#F7D6C8] to-[#E2B19D]', // Peach/Cream
+    'from-[#C8D6E5] to-[#8395A7]', // Stone/Slate
+  ];
+  const index = Math.abs(hash) % gradients.length;
+  return gradients[index];
+};
+
+const getAvatarInitials = (anonId: string) => {
+  if (!anonId) return 'An';
+  const clean = anonId.replace('Anon_', '');
+  return clean.substring(0, 2).toUpperCase();
+};
+
+// Pulsing skeleton card loader component
+const SkeletonCard = () => (
+  <div className="bg-card border border-card-border/50 rounded-2xl p-6 space-y-4 animate-pulse w-full max-w-2xl mx-auto">
+    <div className="flex items-center gap-3">
+      <div className="w-9 h-9 rounded-full bg-card-darker" />
+      <div className="space-y-1.5 flex-grow">
+        <div className="h-3 bg-card-darker rounded w-24" />
+        <div className="h-2 bg-card-darker rounded w-16" />
+      </div>
+    </div>
+    <div className="space-y-2">
+      <div className="h-3.5 bg-card-darker rounded w-full" />
+      <div className="h-3.5 bg-card-darker rounded w-11/12" />
+      <div className="h-3.5 bg-card-darker rounded w-2/3" />
+    </div>
+    <div className="flex justify-between items-center pt-4 border-t border-card-border/30">
+      <div className="flex gap-1.5">
+        <div className="h-5 bg-card-darker rounded-full w-12" />
+        <div className="h-5 bg-card-darker rounded-full w-12" />
+      </div>
+      <div className="h-7 bg-card-darker rounded-xl w-32" />
+    </div>
+  </div>
+);
+
+// Stagger entry configurations
+const containerVariants = {
+  hidden: { opacity: 0 },
+  show: {
+    opacity: 1,
+    transition: {
+      staggerChildren: 0.06,
+    },
+  },
+};
+
+const itemVariants = {
+  hidden: { opacity: 0, y: 15 },
+  show: {
+    opacity: 1,
+    y: 0,
+    transition: {
+      type: 'spring',
+      stiffness: 90,
+      damping: 14,
+    },
+  },
+};
 
 export const Feed: React.FC<FeedProps> = ({
   onNavigateToHome,
@@ -60,7 +133,7 @@ export const Feed: React.FC<FeedProps> = ({
   };
 
   useEffect(() => {
-    api.get('/api/health')
+    api.get('health')
       .then((res) => {
         if (res.data && res.data.status === 'ok') {
           setServerStatus('online');
@@ -78,7 +151,7 @@ export const Feed: React.FC<FeedProps> = ({
     try {
       setIsLoading(true);
       const tagQuery = tagFilter ? `&tag=${tagFilter}` : '';
-      const response = await api.get(`/api/posts?page=${pageNum}${tagQuery}`);
+      const response = await api.get(`posts?page=${pageNum}${tagQuery}`);
       
       if (response.data) {
         if (append) {
@@ -94,7 +167,7 @@ export const Feed: React.FC<FeedProps> = ({
         }
       }
     } catch (error) {
-      console.error('Failed to fetch posts');
+      console.error('Failed to fetch posts:', error);
     } finally {
       setIsLoading(false);
     }
@@ -119,7 +192,7 @@ export const Feed: React.FC<FeedProps> = ({
       return;
     }
     try {
-      const response = await api.post('/api/chat/start', { postId });
+      const response = await api.post('chat/start', { postId });
       if (response.data && response.data.roomId) {
         onNavigateToChat(response.data.roomId);
       }
@@ -150,7 +223,7 @@ export const Feed: React.FC<FeedProps> = ({
   const handleDeletePost = async (postId: string) => {
     if (!window.confirm('Are you sure you want to remove this post?')) return;
     try {
-      await api.delete(`/api/posts/${postId}`);
+      await api.delete(`posts/${postId}`);
       setPosts((prev) => prev.filter((p) => p._id !== postId));
     } catch (error) {
       alert('Failed to delete post. You may not be authorized.');
@@ -237,8 +310,8 @@ export const Feed: React.FC<FeedProps> = ({
       </header>
 
       {/* Main Container */}
-      <main className="flex-grow py-10 bg-background/40">
-        <Container size="lg" className="space-y-10">
+      <main className="flex-grow py-8 bg-background/40">
+        <Container size="lg" className="space-y-8">
           
           {/* Feed Title & Share Trigger */}
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
@@ -251,7 +324,7 @@ export const Feed: React.FC<FeedProps> = ({
             <Button
               variant="primary"
               onClick={handleCreatePostTrigger}
-              className="w-full sm:w-auto px-5 py-2.5 text-xs rounded-xl font-semibold flex items-center justify-center gap-2 shadow-soft"
+              className="hidden sm:inline-flex px-5 py-2.5 text-xs rounded-xl font-semibold items-center gap-2 shadow-soft"
             >
               <Plus className="w-4 h-4" />
               <span>Share what's on your mind</span>
@@ -260,13 +333,13 @@ export const Feed: React.FC<FeedProps> = ({
 
           {/* Tag Filter Bar */}
           <div className="py-2 border-y border-card-border/45 overflow-x-auto scrollbar-none">
-            <div className="flex gap-2 min-w-max">
+            <div className="flex gap-2 min-w-max px-1">
               <button
                 onClick={() => handleTagSelect(null)}
-                className={`px-4 py-1.5 rounded-full text-xs font-medium border transition-all duration-200 ${
+                className={`px-4 py-1.5 rounded-full text-xs font-semibold tracking-wide border transition-all duration-200 ${
                   selectedTag === null
-                    ? 'bg-primary border-primary text-background'
-                    : 'bg-card border-card-border text-text-secondary hover:border-primary/30 hover:text-primary'
+                    ? 'bg-primary border-primary text-background shadow-subtle scale-105'
+                    : 'bg-card border-card-border text-text-secondary hover:border-primary/40 hover:text-primary'
                 }`}
               >
                 All posts
@@ -275,10 +348,10 @@ export const Feed: React.FC<FeedProps> = ({
                 <button
                   key={tag}
                   onClick={() => handleTagSelect(tag)}
-                  className={`px-4 py-1.5 rounded-full text-xs font-medium border transition-all duration-200 capitalize ${
+                  className={`px-4 py-1.5 rounded-full text-xs font-semibold tracking-wide border transition-all duration-200 capitalize ${
                     selectedTag === tag
-                      ? 'bg-primary border-primary text-background'
-                      : 'bg-card border-card-border text-text-secondary hover:border-primary/30 hover:text-primary'
+                      ? 'bg-primary border-primary text-background shadow-subtle scale-105'
+                      : 'bg-card border-card-border text-text-secondary hover:border-primary/40 hover:text-primary'
                   }`}
                 >
                   {tag}
@@ -287,9 +360,15 @@ export const Feed: React.FC<FeedProps> = ({
             </div>
           </div>
 
-          {/* Posts List */}
+          {/* Posts List / Skeleton Loading Container */}
           <div className="space-y-6">
-            {posts.length === 0 && !isLoading ? (
+            {isLoading && posts.length === 0 ? (
+              <div className="space-y-5 w-full">
+                <SkeletonCard />
+                <SkeletonCard />
+                <SkeletonCard />
+              </div>
+            ) : posts.length === 0 && !isLoading ? (
               <div className="py-20 text-center max-w-sm mx-auto">
                 <AlertCircle className="w-10 h-10 text-primary/60 mx-auto mb-4" />
                 <h3 className="text-lg font-medium text-text-primary mb-2">
@@ -309,93 +388,101 @@ export const Feed: React.FC<FeedProps> = ({
                 </Button>
               </div>
             ) : (
-              <div className="grid grid-cols-1 gap-6 max-w-2xl mx-auto">
-                <AnimatePresence mode="popLayout">
-                  {posts.map((post) => {
-                    const isOwnPost = isAuthenticated && post.authorAnonId === anonId;
-                    return (
-                      <Card
-                        key={post._id}
-                        animate
-                        className="relative border-card-border/60 hover:shadow-soft transition-all duration-300"
-                      >
-                        {/* Post Header */}
-                        <div className="flex items-center justify-between gap-4 mb-4">
-                          <div className="flex items-center gap-2">
-                            <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-primary-light text-primary border border-primary/20">
-                              {post.authorAnonId}
-                            </span>
-                            <span className="text-[11px] text-text-muted font-medium">
-                              {formatDistanceToNow(new Date(post.createdAt), { addSuffix: true })}
-                            </span>
-                          </div>
-
-                          {/* Delete / Report Trigger */}
-                          {isOwnPost ? (
-                            <button
-                              onClick={() => handleDeletePost(post._id)}
-                              className="text-text-secondary hover:text-red-600 p-1 rounded-lg hover:bg-red-50/50 transition-colors focus:outline-none"
-                              title="Delete post"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
-                          ) : (
-                            isAuthenticated && (
-                              <button
-                                onClick={() => handleOpenReportModal('post', post._id)}
-                                className="text-text-secondary hover:text-red-500 p-1 rounded-lg hover:bg-red-50/50 transition-colors focus:outline-none"
-                                title="Report post"
-                              >
-                                <Flag className="w-3.5 h-3.5" />
-                              </button>
-                            )
-                          )}
-                        </div>
-
-                        {/* Post Content */}
-                        <p className="text-sm text-text-primary font-light leading-relaxed whitespace-pre-wrap mb-5">
-                          {post.content}
-                        </p>
-
-                        {/* Post Footer */}
-                        <div className="flex flex-wrap items-center justify-between gap-3 pt-4 border-t border-card-border/40">
-                          {/* Tags */}
-                          <div className="flex flex-wrap gap-1.5">
-                            {post.tags.map((tag) => (
-                              <span
-                                key={tag}
-                                className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-card-darker text-text-secondary border border-card-border/50 capitalize"
-                              >
-                                #{tag}
-                              </span>
-                            ))}
-                          </div>
-
-                          {/* Action Button */}
-                          <button
-                            onClick={() => handleStartChat(post._id)}
-                            className="inline-flex items-center gap-1.5 text-xs text-primary hover:text-primary-hover font-semibold transition-colors focus:outline-none"
+              <div className="grid grid-cols-1 gap-5 max-w-2xl mx-auto">
+                <motion.div
+                  variants={containerVariants}
+                  initial="hidden"
+                  animate="show"
+                  className="space-y-5 w-full"
+                >
+                  <AnimatePresence mode="popLayout">
+                    {posts.map((post) => {
+                      const isOwnPost = isAuthenticated && post.authorAnonId === anonId;
+                      return (
+                        <motion.div
+                          key={post._id}
+                          variants={itemVariants}
+                          layout
+                        >
+                          <Card
+                            className="relative border-card-border/50 hover:border-card-border hover:shadow-subtle transition-all duration-300 p-6"
                           >
-                            <MessageSquare className="w-3.5 h-3.5" />
-                            <span>Listen & Respond</span>
-                          </button>
-                        </div>
-                      </Card>
-                    );
-                  })}
-                </AnimatePresence>
+                            {/* Post Header */}
+                            <div className="flex items-center justify-between gap-3 mb-4">
+                              <div className="flex items-center gap-3">
+                                <div className={`w-9 h-9 rounded-full bg-gradient-to-tr ${getAvatarColor(post.authorAnonId)} flex items-center justify-center text-white text-[11px] font-bold shadow-sm shrink-0`}>
+                                  {getAvatarInitials(post.authorAnonId)}
+                                </div>
+                                <div className="flex flex-col">
+                                  <span className="text-xs font-semibold text-text-primary leading-none">
+                                    {post.authorAnonId}
+                                  </span>
+                                  <span className="text-[10px] text-text-muted font-light mt-1">
+                                    {formatDistanceToNow(new Date(post.createdAt), { addSuffix: true })}
+                                  </span>
+                                </div>
+                              </div>
+
+                              {/* Delete / Report Trigger */}
+                              {isOwnPost ? (
+                                <button
+                                  onClick={() => handleDeletePost(post._id)}
+                                  className="text-text-secondary hover:text-red-600 p-1.5 rounded-xl hover:bg-red-50/50 transition-colors focus:outline-none"
+                                  title="Delete post"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </button>
+                              ) : (
+                                isAuthenticated && (
+                                  <button
+                                    onClick={() => handleOpenReportModal('post', post._id)}
+                                    className="text-text-secondary hover:text-red-500 p-1.5 rounded-xl hover:bg-red-50/50 transition-colors focus:outline-none"
+                                    title="Report post"
+                                  >
+                                    <Flag className="w-3.5 h-3.5" />
+                                  </button>
+                                )
+                              )}
+                            </div>
+
+                            {/* Post Content */}
+                            <p className="text-[15px] text-text-primary font-light leading-relaxed max-w-prose whitespace-pre-wrap mb-5">
+                              {post.content}
+                            </p>
+
+                            {/* Post Footer */}
+                            <div className="flex flex-wrap items-center justify-between gap-3 pt-4 border-t border-card-border/40">
+                              {/* Tags */}
+                              <div className="flex flex-wrap gap-1.5">
+                                {post.tags.map((tag) => (
+                                  <span
+                                    key={tag}
+                                    className="text-[10px] font-medium px-2.5 py-0.5 rounded-full bg-card-darker text-text-secondary border border-card-border/30 capitalize"
+                                  >
+                                    #{tag}
+                                  </span>
+                                ))}
+                              </div>
+
+                              {/* Action Button */}
+                              <button
+                                onClick={() => handleStartChat(post._id)}
+                                className="inline-flex items-center gap-1.5 text-xs text-primary hover:text-primary-hover font-semibold transition-all duration-200 px-3 py-1.5 rounded-xl hover:bg-primary/5 focus:outline-none"
+                              >
+                                <MessageSquare className="w-3.5 h-3.5" />
+                                <span>Listen & Respond</span>
+                              </button>
+                            </div>
+                          </Card>
+                        </motion.div>
+                      );
+                    })}
+                  </AnimatePresence>
+                </motion.div>
               </div>
             )}
 
-            {/* Loading Indicator */}
-            {isLoading && (
-              <div className="text-center py-6 text-sm text-text-secondary">
-                <div className="inline-block w-5 h-5 border-2 border-primary border-t-transparent rounded-full animate-spin mr-2" />
-                Loading posts...
-              </div>
-            )}
-
-            {/* Load More Button */}
+            {/* Load More Trigger */}
             {!isLoading && hasMore && posts.length > 0 && (
               <div className="text-center pt-6">
                 <Button
@@ -407,9 +494,26 @@ export const Feed: React.FC<FeedProps> = ({
                 </Button>
               </div>
             )}
+
+            {/* Inline Loading Spinners on Pagination scroll */}
+            {isLoading && posts.length > 0 && (
+              <div className="text-center py-6 text-sm text-text-secondary">
+                <div className="inline-block w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin mr-2" />
+                Loading older stories...
+              </div>
+            )}
           </div>
         </Container>
       </main>
+
+      {/* Mobile Floating Action Button */}
+      <button
+        onClick={handleCreatePostTrigger}
+        className="fixed bottom-6 right-6 z-40 p-4 rounded-full bg-primary text-background shadow-lg hover:bg-primary-hover hover:scale-105 active:scale-95 transition-all duration-200 sm:hidden flex items-center justify-center focus:outline-none"
+        title="Share what's on your mind"
+      >
+        <Plus className="w-6 h-6" />
+      </button>
 
       {/* Footer */}
       <footer className="border-t border-card-border bg-card/60 py-8">

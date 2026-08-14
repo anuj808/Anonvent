@@ -1,19 +1,14 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { motion } from 'framer-motion';
-import { formatDistanceToNow } from 'date-fns';
-import { Send, LogOut, ArrowLeft, ShieldAlert, Flag } from 'lucide-react';
+import { AnimatePresence, motion } from 'framer-motion';
+import { isSameDay, format, isToday, isYesterday } from 'date-fns';
+import { Send, LogOut, ArrowLeft, ShieldAlert, Flag, MoreVertical } from 'lucide-react';
 import api from '../lib/axios';
-import ReportModal from '../components/moderation/ReportModal';
 import { useAuth } from '../context/AuthContext';
 import { useSocket } from '../context/SocketContext';
 import { Container } from '../components/ui/Container';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
-
-interface ChatRoomProps {
-  roomId: string;
-  onNavigateToInbox: () => void;
-}
+import ReportModal from '../components/moderation/ReportModal';
 
 interface MessageType {
   _id: string;
@@ -23,16 +18,56 @@ interface MessageType {
   createdAt: string;
 }
 
+interface ChatRoomProps {
+  roomId: string;
+  onNavigateToInbox: () => void;
+}
+
+// Helpers for hash-based visual identity
+const getAvatarColor = (anonId: string) => {
+  if (!anonId) return 'from-stone-300 to-stone-400';
+  let hash = 0;
+  for (let i = 0; i < anonId.length; i++) {
+    hash = anonId.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  const gradients = [
+    'from-[#A3B899] to-[#607264]', // Sage
+    'from-[#D2C5E3] to-[#9C8EB9]', // Soft lavender
+    'from-[#BEE3DB] to-[#89B0A5]', // Dusty teal
+    'from-[#E8D7F1] to-[#D3BCCC]', // Lavender blush
+    'from-[#F7D6C8] to-[#E2B19D]', // Peach/Cream
+    'from-[#C8D6E5] to-[#8395A7]', // Stone/Slate
+  ];
+  const index = Math.abs(hash) % gradients.length;
+  return gradients[index];
+};
+
+const getAvatarInitials = (anonId: string) => {
+  if (!anonId) return 'An';
+  const clean = anonId.replace('Anon_', '');
+  return clean.substring(0, 2).toUpperCase();
+};
+
+const getMessageDateGroupLabel = (dateString: string) => {
+  const date = new Date(dateString);
+  if (isToday(date)) return 'Today';
+  if (isYesterday(date)) return 'Yesterday';
+  return format(date, 'MMMM d, yyyy');
+};
+
 export const ChatRoom: React.FC<ChatRoomProps> = ({ roomId, onNavigateToInbox }) => {
   const { anonId, isAuthenticated } = useAuth();
   const { socket, isConnected, isReconnecting } = useSocket();
   const [messages, setMessages] = useState<MessageType[]>([]);
-  const [inputText, setInputText] = useState<string>('');
-  const [otherParticipantAnonId, setOtherParticipantAnonId] = useState<string>('Someone');
+  const [otherParticipantAnonId, setOtherParticipantAnonId] = useState<string | null>(null);
   const [isOtherTyping, setIsOtherTyping] = useState<boolean>(false);
+  const [inputText, setInputText] = useState<string>('');
   const [roomStatus, setRoomStatus] = useState<string>('active');
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
+
+  // Dropdown states
+  const [isMenuOpen, setIsMenuOpen] = useState<boolean>(false);
 
   // Moderation state
   const [isReportModalOpen, setIsReportModalOpen] = useState<boolean>(false);
@@ -49,7 +84,7 @@ export const ChatRoom: React.FC<ChatRoomProps> = ({ roomId, onNavigateToInbox })
     const confirmText = "You won't see each other's posts or messages anymore. This can't be undone from here.";
     if (!window.confirm(confirmText)) return;
     try {
-      await api.post('/api/blocks', { roomId });
+      await api.post('blocks', { roomId });
       alert('User blocked successfully.');
       onNavigateToInbox();
     } catch (err) {
@@ -69,7 +104,7 @@ export const ChatRoom: React.FC<ChatRoomProps> = ({ roomId, onNavigateToInbox })
     try {
       setIsLoading(true);
       setError(null);
-      const response = await api.get(`/api/chat/rooms/${roomId}/messages`);
+      const response = await api.get(`chat/rooms/${roomId}/messages`);
       if (response.data) {
         setRoomStatus(response.data.status);
         setMessages(response.data.messages);
@@ -172,7 +207,7 @@ export const ChatRoom: React.FC<ChatRoomProps> = ({ roomId, onNavigateToInbox })
   const handleEndChat = async () => {
     if (!window.confirm('Are you sure you want to end this conversation permanently? This room will be closed.')) return;
     try {
-      await api.post(`/api/chat/rooms/${roomId}/close`);
+      await api.post(`chat/rooms/${roomId}/close`);
       setRoomStatus('closed');
       onNavigateToInbox();
     } catch (err) {
@@ -181,7 +216,7 @@ export const ChatRoom: React.FC<ChatRoomProps> = ({ roomId, onNavigateToInbox })
   };
 
   return (
-    <div className="min-h-screen flex flex-col justify-between selection:bg-primary/10 selection:text-primary-dark bg-background/20">
+    <div className="min-h-screen flex flex-col justify-between selection:bg-primary/10 selection:text-primary-dark bg-[#FAFAFA]">
       {/* Header */}
       <header className="border-b border-card-border/60 bg-background/80 backdrop-blur-md sticky top-0 z-40 transition-all duration-300">
         <Container size="md" className="h-16 flex items-center justify-between">
@@ -191,38 +226,80 @@ export const ChatRoom: React.FC<ChatRoomProps> = ({ roomId, onNavigateToInbox })
               className="text-text-secondary hover:text-text-primary p-1.5 rounded-lg hover:bg-card-darker transition-colors focus:outline-none"
               title="Back to inbox"
             >
-              <ArrowLeft className="w-5.5 h-5.5" />
+              <ArrowLeft className="w-5 h-5" />
             </button>
-            <div className="flex flex-col">
-              <span className="text-sm font-semibold text-text-primary">
-                Chat with {otherParticipantAnonId}
-              </span>
-              <span className="text-[10px] text-text-secondary font-medium leading-none mt-0.5">
-                {roomStatus === 'closed' ? 'Conversation closed' : 'Active Anonymous Session'}
-              </span>
+            
+            <div className="flex items-center gap-2.5">
+              <div className={`w-9 h-9 rounded-full bg-gradient-to-tr ${getAvatarColor(otherParticipantAnonId || '')} flex items-center justify-center text-white text-[11px] font-bold shadow-sm shrink-0`}>
+                {getAvatarInitials(otherParticipantAnonId || '')}
+              </div>
+              <div className="flex flex-col">
+                <span className="text-sm font-semibold text-text-primary">
+                  {otherParticipantAnonId || 'Anonymous Peer'}
+                </span>
+                <span className="text-[10px] text-text-secondary font-light leading-none mt-1">
+                  {roomStatus === 'closed' ? (
+                    'Conversation ended'
+                  ) : (
+                    <span className="flex items-center gap-1.5">
+                      <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
+                      Active now
+                    </span>
+                  )}
+                </span>
+              </div>
             </div>
           </div>
 
           <div className="flex items-center gap-2">
             {roomStatus === 'active' && (
-              <>
+              <div className="relative">
                 <button
-                  onClick={handleBlockUser}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-red-200 text-[11px] font-semibold text-red-600 bg-red-50/50 hover:bg-red-50 transition-colors focus:outline-none"
-                  title="Block user"
+                  onClick={() => setIsMenuOpen(!isMenuOpen)}
+                  className="p-2 rounded-xl text-text-secondary hover:text-text-primary hover:bg-card-darker transition-colors focus:outline-none"
+                  title="Conversation settings"
                 >
-                  <ShieldAlert className="w-3.5 h-3.5" />
-                  <span className="hidden sm:inline">Block</span>
+                  <MoreVertical className="w-5 h-5" />
                 </button>
-                <button
-                  onClick={handleEndChat}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-card-border text-[11px] font-semibold text-text-secondary bg-card-darker hover:bg-card transition-colors focus:outline-none"
-                  title="End Conversation"
-                >
-                  <LogOut className="w-3.5 h-3.5" />
-                  <span className="hidden sm:inline">End Chat</span>
-                </button>
-              </>
+                
+                <AnimatePresence>
+                  {isMenuOpen && (
+                    <>
+                      {/* Backdrop overlay to close menu */}
+                      <div className="fixed inset-0 z-40" onClick={() => setIsMenuOpen(false)} />
+                      
+                      <motion.div
+                        initial={{ opacity: 0, scale: 0.95, y: -10 }}
+                        animate={{ opacity: 1, scale: 1, y: 0 }}
+                        exit={{ opacity: 0, scale: 0.95, y: -10 }}
+                        transition={{ duration: 0.15 }}
+                        className="absolute right-0 mt-2 w-48 bg-card border border-card-border shadow-md rounded-2xl py-2 z-50 overflow-hidden"
+                      >
+                        <button
+                          onClick={() => {
+                            setIsMenuOpen(false);
+                            handleBlockUser();
+                          }}
+                          className="w-full text-left px-4 py-2.5 text-xs text-red-600 hover:bg-red-50/50 font-semibold transition-colors flex items-center gap-2"
+                        >
+                          <ShieldAlert className="w-4 h-4" />
+                          Block User
+                        </button>
+                        <button
+                          onClick={() => {
+                            setIsMenuOpen(false);
+                            handleEndChat();
+                          }}
+                          className="w-full text-left px-4 py-2.5 text-xs text-text-primary hover:bg-card-darker font-semibold transition-colors flex items-center gap-2"
+                        >
+                          <LogOut className="w-4 h-4" />
+                          End Chat
+                        </button>
+                      </motion.div>
+                    </>
+                  )}
+                </AnimatePresence>
+              </div>
             )}
           </div>
         </Container>
@@ -252,45 +329,64 @@ export const ChatRoom: React.FC<ChatRoomProps> = ({ roomId, onNavigateToInbox })
                 </Button>
               </Card>
             ) : messages.length === 0 ? (
-              <div className="text-center py-20 text-xs text-text-muted font-semibold max-w-xs mx-auto">
-                No messages yet. Send a warm greeting to start your conversation.
+              <div className="flex flex-col items-center justify-center py-16 text-center space-y-3">
+                <div className={`w-14 h-14 rounded-full bg-gradient-to-tr ${getAvatarColor(otherParticipantAnonId || '')} flex items-center justify-center text-white text-base font-bold shadow-md`}>
+                  {getAvatarInitials(otherParticipantAnonId || '')}
+                </div>
+                <h4 className="text-sm font-semibold text-text-primary">{otherParticipantAnonId || 'Anonymous Peer'}</h4>
+                <p className="text-xs text-text-secondary font-light max-w-[240px] leading-relaxed">
+                  Say hello — you're both anonymous here in this peaceful space.
+                </p>
               </div>
             ) : (
-              <div className="flex flex-col space-y-3">
-                {messages.map((msg) => {
+              <div className="flex flex-col space-y-2">
+                {messages.map((msg, index) => {
                   const isMe = msg.senderAnonId === anonId;
+                  const currentDateLabel = getMessageDateGroupLabel(msg.createdAt);
+                  const prevMessage = index > 0 ? messages[index - 1] : null;
+                  const showDateSeparator = !prevMessage || !isSameDay(new Date(msg.createdAt), new Date(prevMessage.createdAt));
+
                   return (
-                    <motion.div
-                      key={msg._id}
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ duration: 0.3 }}
-                      className={`flex flex-col max-w-[75%] ${isMe ? 'self-end' : 'self-start'}`}
-                    >
-                      <div
-                        className={`p-3.5 rounded-2xl text-sm leading-relaxed whitespace-pre-wrap shadow-subtle border ${
-                          isMe
-                            ? 'bg-primary text-background border-primary/20 rounded-tr-sm rounded-br-2xl'
-                            : 'bg-card text-text-primary border-card-border rounded-tl-sm rounded-bl-2xl'
-                        }`}
+                    <React.Fragment key={msg._id}>
+                      {showDateSeparator && (
+                        <div className="flex justify-center my-4">
+                          <span className="text-[10px] font-semibold text-text-muted bg-card-darker border border-card-border/40 px-3 py-1 rounded-full uppercase tracking-wider select-none">
+                            {currentDateLabel}
+                          </span>
+                        </div>
+                      )}
+                      
+                      <motion.div
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ duration: 0.2 }}
+                        className={`group flex flex-col max-w-[75%] ${isMe ? 'self-end' : 'self-start'}`}
                       >
-                        {msg.content}
-                      </div>
-                      <div className={`flex items-center gap-1.5 mt-1 px-1 ${isMe ? 'self-end' : 'self-start'} text-text-muted`}>
-                        <span className="text-[9px] font-medium">
-                          {formatDistanceToNow(new Date(msg.createdAt), { addSuffix: true })}
-                        </span>
-                        {!isMe && (
-                          <button
-                            onClick={() => handleOpenReportModal('message', msg._id)}
-                            className="hover:text-red-500 transition-colors focus:outline-none"
-                            title="Report message"
-                          >
-                            <Flag className="w-3 h-3" />
-                          </button>
-                        )}
-                      </div>
-                    </motion.div>
+                        <div
+                          className={`py-2.5 px-4 text-sm leading-relaxed whitespace-pre-wrap ${
+                            isMe
+                              ? 'bg-[#607264] text-white rounded-2xl rounded-tr-sm rounded-br-2xl'
+                              : 'bg-card text-text-primary border border-card-border/40 rounded-2xl rounded-tl-sm rounded-bl-2xl shadow-subtle'
+                          }`}
+                        >
+                          {msg.content}
+                        </div>
+                        <div className={`flex items-center gap-1.5 mt-1 px-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200 text-text-muted ${isMe ? 'self-end' : 'self-start'}`}>
+                          <span className="text-[9px] font-medium">
+                            {format(new Date(msg.createdAt), 'h:mm a')}
+                          </span>
+                          {!isMe && (
+                            <button
+                              onClick={() => handleOpenReportModal('message', msg._id)}
+                              className="hover:text-red-500 transition-colors focus:outline-none"
+                              title="Report message"
+                            >
+                              <Flag className="w-3 h-3" />
+                            </button>
+                          )}
+                        </div>
+                      </motion.div>
+                    </React.Fragment>
                   );
                 })}
 
@@ -299,15 +395,12 @@ export const ChatRoom: React.FC<ChatRoomProps> = ({ roomId, onNavigateToInbox })
                   <motion.div
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
-                    className="flex self-start max-w-[70%]"
+                    className="flex self-start mt-2"
                   >
-                    <div className="p-3 bg-card-darker text-text-secondary border border-card-border/60 rounded-2xl rounded-tl-sm rounded-bl-2xl text-xs font-semibold flex items-center gap-1.5 shadow-subtle">
-                      <span className="inline-flex gap-0.5">
-                        <span className="w-1.5 h-1.5 bg-text-secondary rounded-full animate-bounce" style={{ animationDelay: '0.1s' }} />
-                        <span className="w-1.5 h-1.5 bg-text-secondary rounded-full animate-bounce" style={{ animationDelay: '0.2s' }} />
-                        <span className="w-1.5 h-1.5 bg-text-secondary rounded-full animate-bounce" style={{ animationDelay: '0.3s' }} />
-                      </span>
-                      <span>{otherParticipantAnonId} is writing...</span>
+                    <div className="flex items-center gap-1 bg-card border border-card-border/40 px-4 py-3 rounded-2xl rounded-tl-sm w-16 justify-center shadow-subtle">
+                      <span className="w-1.5 h-1.5 bg-text-secondary rounded-full animate-bounce shrink-0" style={{ animationDelay: '0ms' }} />
+                      <span className="w-1.5 h-1.5 bg-text-secondary rounded-full animate-bounce shrink-0" style={{ animationDelay: '150ms' }} />
+                      <span className="w-1.5 h-1.5 bg-text-secondary rounded-full animate-bounce shrink-0" style={{ animationDelay: '300ms' }} />
                     </div>
                   </motion.div>
                 )}
@@ -327,22 +420,29 @@ export const ChatRoom: React.FC<ChatRoomProps> = ({ roomId, onNavigateToInbox })
                   🔒 This conversation has been ended permanently.
                 </div>
               ) : (
-                <form onSubmit={handleSendMessage} className="flex gap-2">
+                <form onSubmit={handleSendMessage} className="flex items-center bg-background border border-card-border/60 rounded-full px-4 py-1.5 gap-2 w-full shadow-subtle">
                   <input
                     type="text"
                     required
                     value={inputText}
                     onChange={handleInputChange}
                     placeholder="Type an empathetic message..."
-                    className="flex-grow px-4 py-3 bg-background border border-card-border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all text-text-primary font-light"
+                    className="flex-grow bg-transparent border-none py-2 text-sm focus:outline-none text-text-primary font-light placeholder-text-muted"
                   />
-                  <Button
-                    type="submit"
-                    disabled={!inputText.trim() || !isConnected}
-                    className="px-5 py-3 rounded-xl flex items-center justify-center shrink-0"
-                  >
-                    <Send className="w-4 h-4 text-background" />
-                  </Button>
+                  <AnimatePresence>
+                    {inputText.trim() && (
+                      <motion.button
+                        type="submit"
+                        initial={{ opacity: 0, scale: 0.8 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        exit={{ opacity: 0, scale: 0.8 }}
+                        disabled={!isConnected}
+                        className="p-2 rounded-full bg-primary text-background flex items-center justify-center shrink-0 hover:bg-primary-hover active:scale-95 transition-all duration-150 focus:outline-none"
+                      >
+                        <Send className="w-3.5 h-3.5" />
+                      </motion.button>
+                    )}
+                  </AnimatePresence>
                 </form>
               )}
             </Container>

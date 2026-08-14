@@ -52,7 +52,7 @@ export const Admin: React.FC<AdminProps> = ({ onNavigateToHome, onNavigateToFeed
     try {
       setDataLoading(true);
       setError(null);
-      const res = await api.get(`/admin/reports?page=${page}&status=pending`);
+      const res = await api.get(`admin/reports?page=${page}&status=pending`);
       if (res.data) {
         setReports(res.data.reports);
         setTotalPages(res.data.totalPages);
@@ -68,7 +68,7 @@ export const Admin: React.FC<AdminProps> = ({ onNavigateToHome, onNavigateToFeed
     try {
       setDataLoading(true);
       setError(null);
-      const res = await api.get('/admin/flagged-posts');
+      const res = await api.get('admin/flagged-posts');
       if (res.data) {
         setFlaggedPosts(res.data);
       }
@@ -91,7 +91,7 @@ export const Admin: React.FC<AdminProps> = ({ onNavigateToHome, onNavigateToFeed
 
   const handleUpdateReportStatus = async (reportId: string, newStatus: 'reviewed' | 'actioned' | 'dismissed') => {
     try {
-      await api.patch(`/admin/reports/${reportId}`, { status: newStatus });
+      await api.patch(`admin/reports/${reportId}`, { status: newStatus });
       setReports((prev) => prev.filter((r) => r._id !== reportId));
     } catch (err) {
       alert('Failed to update report status');
@@ -100,7 +100,7 @@ export const Admin: React.FC<AdminProps> = ({ onNavigateToHome, onNavigateToFeed
 
   const handleUnflagPost = async (postId: string) => {
     try {
-      await api.patch(`/admin/posts/${postId}/unflag`);
+      await api.patch(`admin/posts/${postId}/unflag`);
       setFlaggedPosts((prev) => prev.filter((p) => p._id !== postId));
     } catch (err) {
       alert('Failed to unflag post');
@@ -110,7 +110,7 @@ export const Admin: React.FC<AdminProps> = ({ onNavigateToHome, onNavigateToFeed
   const handleDeletePost = async (postId: string) => {
     if (!window.confirm('Are you sure you want to permanently delete this post? This cannot be undone.')) return;
     try {
-      await api.delete(`/admin/posts/${postId}`);
+      await api.delete(`admin/posts/${postId}`);
       setFlaggedPosts((prev) => prev.filter((p) => p._id !== postId));
     } catch (err) {
       alert('Failed to delete post');

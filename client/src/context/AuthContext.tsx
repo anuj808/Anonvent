@@ -24,7 +24,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const checkAuth = async () => {
     try {
-      const response = await api.get('/auth/me');
+      const response = await api.get('auth/me');
       if (response.data && response.data.anonId) {
         setAnonId(response.data.anonId);
         setIsAdmin(!!response.data.isAdmin);
@@ -45,7 +45,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   const login = async (email: string, password: string) => {
-    const response = await api.post('/auth/login', { email, password });
+    const response = await api.post('auth/login', { email, password });
     if (response.data && response.data.anonId) {
       setAnonId(response.data.anonId);
       setIsAdmin(!!response.data.isAdmin);
@@ -54,7 +54,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const register = async (email: string, password: string) => {
-    const response = await api.post('/auth/register', { email, password });
+    const response = await api.post('auth/register', { email, password });
     if (response.data && response.data.anonId) {
       // Auto login user after registration for seamless UX
       await login(email, password);
@@ -63,7 +63,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const logout = async () => {
     try {
-      await api.post('/auth/logout');
+      await api.post('auth/logout');
     } catch (error) {
       console.error('Logout error occurred');
     } finally {
